@@ -1,0 +1,978 @@
+---
+title: "Midterm Project"
+date: "5/11/2020"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+---
+
+```{r echo = FALSE, message = FALSE}
+# Course: BUAN 5260
+# Title: Midterm Project
+# Date: May 11th, 2020
+
+# Clear packages 
+if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(
+  paste("package:", names(sessionInfo()$otherPkgs), sep=""), 
+  detach, character.only = TRUE, unload = TRUE)
+
+# Clear environment
+rm(list = ls(all = TRUE)) 
+
+```
+
+
+# Technical Appendix
+
+
+```{r warning= FALSE, message=FALSE}
+# Load packages
+library(hablar)
+`%>%` <- magrittr::`%>%`
+library(lpSolveAPI)
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+
+```
+
+```{r}
+options(scipen = 999)
+```
+
+
+## Data Preprocessing
+
+```{r}
+# Read in csv
+
+raw_data <- read.csv("5260_Aiding_Africa_Data.csv", header = TRUE)
+
+# Separate each table
+table_1 <- raw_data[1:4, 1:3]
+names(table_1) <- as.character(unlist(table_1[1,]))
+table_1 <- table_1[-1,]
+
+table_2 <- raw_data[1:4, 5:6]
+names(table_2) <- as.character(unlist(table_2[1,]))
+table_2 <- table_2[-1,]
+
+table_3 <- raw_data[1:31,8:12]
+names(table_3) <- as.character(unlist(table_3[1,]))
+table_3 <- table_3[-1,]
+
+table_4 <- raw_data[1:10, 14:15]
+names(table_4) <- as.character(unlist(table_4[1,]))
+table_4 <- table_4[-1,]
+
+table_5 <- raw_data[1:16, 17:19]
+names(table_5) <- as.character(unlist(table_5[1,]))
+table_5 <- table_5[-1,]
+
+table_6 <- raw_data[1:7, 21:23]
+names(table_6) <- as.character(unlist(table_6[1,]))
+table_6 <- table_6[-1,]
+
+```
+
+
+```{r}
+
+# Calculate travel time between each city
+
+table_3 <- merge(table_1, table_3, by = c("Type"), all.y = TRUE)
+
+table_3 <- table_3 %>%
+  convert(num(Distance,Speed)) %>% 
+  mutate(Travel_Time = round(Distance/Speed,2))
+
+final_df <- table_3 %>% 
+  select(From, To, Type, Cost, Travel_Time, Capacity)
+
+```
+
+
+```{r}
+# Sorting Dataframe
+
+final_df <- final_df[with(final_df,order(From,To)),]
+```
+
+
+Final Table
+
+```{r echo = FALSE}
+final_df %>%
+  kable() %>%
+  kable_styling()
+
+```
+
+
+## Questions: 
+
+### Q1: Network Map
+
+Different routes workers and suppliers may take to reach the African cities from the US: 
+
+![](midterm_1.PNG)
+
+
+
+### Q2: Quickest Route Plan
+
+How to most quickly move workers from the United States to each of the nine IFRC city?
+
+```{r, results= 'hide'}
+
+# Set up model
+q2 <- make.lp(0, 48)
+
+set.type(q2, 1:48, "bin")
+
+lp.control(q2, sense = "min")
+
+# Set objective fn and constraints
+set.objfn(q2, c(20.25, 172.11, 20.13, 17.6, 186.46, 119.2, 
+                19.86, 180.83, 19.9, 17.71, 195.09, 112.11, 
+                30.43, 192.75, 26.44, 22.76, 244.78, 152.32,  
+                30.04, 201.47, 26.21, 22.87, 253.41, 145.23, 
+                22.12, 308.95, 22.86, 21.04, 214.24, 211.66,
+                21.73, 217.67, 22.63, 21.15, 222.87, 204.57,
+                25.53, 200.41, 24.55, 20.6, 239.5, 173.7,
+                25.14, 209.13, 24.32, 20.71, 248.13, 166.61))
+
+
+# Add constraints
+
+# Supply to mmiddle six cities
+
+add.constraint(q2,c(1, 0, 0, 0, 0, 0, 
+                    1, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+
+
+add.constraint(q2,c(0, 1, 0, 0, 0, 0, 
+                    0, 1, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+
+add.constraint(q2,c(0, 0, 1, 0, 0, 0, 
+                    0, 0, 1, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+
+add.constraint(q2,c(0, 0, 0, 1, 0, 0, 
+                    0, 0, 0, 1, 0, 0, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+
+add.constraint(q2,c(0, 0, 0, 0, 1, 0, 
+                    0, 0, 0, 0, 1, 0, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+
+add.constraint(q2,c(0, 0, 0, 0, 0, 1, 
+                    0, 0, 0, 0, 0, 1, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+
+
+# Supply to strategic cities from US
+
+add.constraint(q2,c(0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0, 
+                    1, 1, 1, 1, 1, 1,  
+                    1, 1, 1, 1, 1, 1, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+add.constraint(q2,c(0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0), "=", 1 )
+
+
+add.constraint(q2,c(0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,  
+                    0, 0, 0, 0, 0, 0, 
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1), "=", 1 )
+
+
+```
+
+```{r}
+# Add row and column names
+dimnames(q2) <- 
+  list(c("Lusaka", "Libreville", "Nairobi", "Khartoum", "Luanda", "Dakar", "Niamey", "Kosongo", "Ndjamena"),
+  c("NewYork_Lusaka", "NewYork_Libreville", "NewYork_Nairobi", "NewYork_Khartoum", "NewYork_Luanda", "NewYork_Dakar",
+  "Jacksonville_Lusaka", "Jacksonville_Libreville", "Jacksonville_Nairobi", "Jacksonville_Khartoum", "Jacksonville_Luanda", "Jacksonville_Dakar",
+  "NewYork_Lusaka_Niamey", "NewYork_Libreville_Niamey", "NewYork_Nairobi_Niamey", "NewYork_Khartoum_Niamey", "NewYork_Luanda_Niamey", "NewYork_Dakar_Niamey",
+  "Jacksonville_Lusaka_Niamey", "Jacksonville_Libreville_Niamey", "Jacksonville_Nairobi_Niamey", "Jacksonville_Khartoum_Niamey", "Jacksonville_Luanda_Niamey", "Jacksonville_Dakar_Niamey",
+  "NewYork_Lusaka_Kosongo", "NewYork_Libreville_Kosongo", "NewYork_Nairobi_Kosongo", "NewYork_Khartoum_Kosongo", "NewYork_Luanda_Kosongo", "NewYork_Dakar_Kosongo",
+  "Jacksonville_Lusaka_Kosongo", "Jacksonville_Libreville_Kosongo", "Jacksonville_Nairobi_Kosongo", "Jacksonville_Khartoum_Kosongo", "Jacksonville_Luanda_Kosongo", "Jacksonville_Dakar_Kosongo",
+  "NewYork_Lusaka_Ndjamena", "NewYork_Libreville_Ndjamena", "NewYork_Nairobi_Ndjamena", "NewYork_Khartoum_Ndjamena", "NewYork_Luanda_Ndjamena", "NewYork_Dakar_Ndjamena",
+  "Jacksonville_Lusaka_Ndjamena", "Jacksonville_Libreville_Ndjamena", "Jacksonville_Nairobi_Ndjamena", "Jacksonville_Khartoum_Ndjamena", "Jacksonville_Luanda_Ndjamena", "Jacksonville_Dakar_Ndjamena"))
+```
+
+
+
+```{r}
+solve(q2)
+```
+
+```{r}
+ps <- get.primal.solution(q2)
+
+# Have to re-enter obj fn to get Sens Ana table since cannot pull from model
+obj_fn <- c(20.25, 172.11, 20.13, 17.6, 186.46, 119.2, 
+            19.86, 180.83, 19.9, 17.71, 195.09, 112.11, 
+            30.43, 192.75, 26.44, 22.76, 244.78, 152.32,  
+            30.04, 201.47, 26.21, 22.87, 253.41, 145.23, 
+            22.12, 308.95, 22.86, 21.04, 214.24, 211.66,
+            21.73, 217.67, 22.63, 21.15, 222.87, 204.57,
+            25.53, 200.41, 24.55, 20.6, 239.5, 173.7,
+            25.14, 209.13, 24.32, 20.71, 248.13, 166.61)
+
+# Get sensitivity analysis
+obj_sa <- get.sensitivity.obj(q2)
+rhs_sa <- get.sensitivity.rhs(q2)
+
+n <- length(get.variables(q2))
+m <- length(get.constr.type(q2))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(ps[2:(n + m + 1)], 
+                c(round(rhs_sa$duals[1:m], 2), obj_fn),
+                round(c(rhs_sa$dualsfrom[1:m],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:m],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(q2), colnames(q2))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+Solution table: 
+
+```{r echo = FALSE}
+# Print the table
+kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "bordered")) 
+
+```
+
+
+We see that from NY to Luanda takes almost 8 days by ship. This is a big bottleneck if Luanda needs urgent supplies. 
+
+
+Quickest Route Network Map: 
+
+
+![](midterm_2.PNG)
+
+
+
+### Q3: Minimum Cost Plan
+
+How to minimize cost and still satisfy each city's requirement?
+
+**Objective Function**
+
+We use 30 variables represent the unit of transportation that goes between cities. 
+
+
+
+Minimize: 
++50 New_Lus +30 New_Lib +55 New_Nai +45 New_Kha +30 New_Lua +32 New_Dak
++57 Jac_Lus +48 Jac_Lib +61 Jac_Nai +49 Jac_Kha +44 Jac_Lua +56 Jac_Dak
++24 Lus_Nia +3 Lib_Nia +28 Nai_Nia +22 Kha_Nia +3 Lua_Nia +5 Dak_Nia
++22 Lus_Kos +4 Lib_Kos +25 Nai_Kos +19 Kha_Kos +5 Lua_Kos +5 Dak_Kos
++23 Lus_Ndj +7 Lib_Ndj +2 Nai_Ndj +4 Kha_Ndj +8 Lua_Ndj +9 Dak_Ndj
+
+**Constraints**
+
+240 New_Dak +240 New_Lib +240 New_Lua +150 New_Kha +150 New_Lus +150 New_Nai = 500000;
+
+240 Jac_Dak +240 Jac_Lib +240 Jac_Lua +150 Jac_Kha +150 Jac_Lus +150 Jac_Nai = 500000;
+
+Dak_Ndj <= 840;
+
+Lib_Ndj <= 840;
+
+Lua_Ndj <= 840;
+
+Dak_Nia = 0;
+
+Lib_Nia = 0;
+
+Lua_Nia = 0;
+
+Kha_Ndj <=200;
+
+Lus_Ndj <=200;
+
+240 New_Dak +240 Jac_Dak -17.7 Dak_Kos -17.7 Dak_Ndj = 50000;
+
+240 New_Lib +240 Jac_Lib -17.7 Lib_Kos -17.7 Lib_Ndj = 100000;
+
+240 New_Lua +240 Jac_Lua -17.7 Lua_Kos -17.7 Lua_Ndj = 130000;
+
+New_Kha +Jac_Kha -Kha_Nia -Kha_Kos -Kha_Ndj = 600;
+
+New_Lus +Jac_Lus -Lus_Nia -Lus_Kos -Lus_Ndj = 1000;
+
+New_Nai +Jac_Nai -Nai_Nia -Nai_Kos -Nai_Ndj = 800;
+
+150 Kha_Nia +150 Lus_Nia +150 Nai_Nia = 100000; 
+
+17.7 Dak_Kos +17.7 Lib_Kos +17.7 Lua_Kos +150 Kha_Kos +150 Lus_Kos +150 Nai_Kos = 180000;
+
+17.7 Dak_Ndj +17.7 Lib_Ndj +17.7 Lua_Ndj +150 Kha_Ndj +150 Lus_Ndj +150 Nai_Ndj = 80000;
+
+
+```{r, results= 'hide'}
+q3 <- make.lp(0, 30)
+
+lp.control(q3, sense = "min")
+
+obj_fn3 <- c(50, 30, 55, 45, 30, 32,
+             57, 48, 61, 49, 44, 56,
+             24,  3, 28, 22,  3,  5,
+             22,  4, 25, 19,  5,  5,
+             23,  7,  2,  4,  8,  9)
+
+set.objfn(q3, obj_fn3)
+
+# Constraints New York & Jacksonville, FL's cargo capacity available
+add.constraint(q3, c(150, 240, 150, 150, 240, 240,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0), "=", 500000)
+
+add.constraint(q3, c(  0,   0,   0,   0,   0,   0,
+                            150, 240, 150, 150, 240, 240,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0), "=", 500000)
+
+# Constraints : The truck routes into Ndjamena, Chad are restricted at maximum 840 trucks.
+add.constraint(q3, c(  0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   1,   0,   0,   0,   0), "<=", 840)
+
+add.constraint(q3, c(  0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   1,   0), "<=", 840)
+
+add.constraint(q3, c(  0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   1), "<=", 840)
+
+# Constraints : At most 200 flights from Lusaka, Zambia to Ndjamena, Chad 
+add.constraint(q3, c(  0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              1,   0,   0,   0,   0,   0), "<=", 200)
+
+
+# Constraints : At most 200 flights from Khartoum, Sudan to Ndjamena, Chad
+add.constraint(q3, c(  0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   1,   0,   0), "<=", 200)
+
+# Constraints : Dakar, Senegal's Supply requirements
+add.constraint(q3, c(  0,   0,   0,   0,   0,   240,
+                              0,   0,   0,   0,   0,   240,
+                              0,   0,   0,   0,   0,   0,
+                              0,   0,   0,   0,   0,  -17.7,
+                              0,   0,   0,   0,   0,  -17.7), "=", 50000)
+
+# Constraints : Libreville, Gabons's Supply requirements
+add.constraint(q3, c(  0,   240,   0,   0,   0,   0,
+                              0,   240,   0,   0,   0,   0,
+                              0,     0,   0,   0,   0,   0,
+                              0, -17.7,   0,   0,   0,   0,
+                              0, -17.7,   0,   0,   0,   0), "=", 100000)
+
+# Constraints : Luanda, Angola's Supply requirements
+add.constraint(q3, c(  0,  0,  0,  0,   240,  0,
+                              0,  0,  0,  0,   240,  0,
+                              0,  0,  0,  0,     0,  0,
+                              0,  0,  0,  0, -17.7,  0,
+                              0,  0,  0,  0, -17.7,  0), "=", 130000)
+
+# Constraints : Khartoum, Sudan's Supply requirements
+add.constraint(q3, c(  0,  0,  0,  150,  0,  0,
+                              0,  0,  0,  150,  0,  0,
+                              0,  0,  0, -150,  0,  0,
+                              0,  0,  0, -150,  0,  0,
+                              0,  0,  0, -150,  0,  0), "=", 90000)
+
+# Constraints : Lusaka, Zambia's Supply requirements
+add.constraint(q3, c(  150, 0,  0,  0,  0,  0,
+                              150, 0,  0,  0,  0,  0,
+                             -150, 0,  0,  0,  0,  0,
+                             -150, 0,  0,  0,  0,  0,
+                             -150, 0,  0,  0,  0,  0), "=", 150000)
+
+# Constraints : Nairobi, Kenya's Supply requirements
+add.constraint(q3, c(  0,  0,  150,  0,  0,  0,
+                              0,  0,  150,  0,  0,  0,
+                              0,  0, -150,  0,  0,  0,
+                              0,  0, -150,  0,  0,  0,
+                              0,  0, -150,  0,  0,  0), "=", 120000)
+
+# Constraints : Niamey, Niger's Supply requirements
+add.constraint(q3, c(  0,  0,    0,    0,  0,  0,
+                              0,  0,    0,    0,  0,  0,
+                            150,  0,  150,  150,  0,  0,
+                              0,  0,    0,    0,  0,  0,
+                              0,  0,    0,    0,  0,  0), "=", 100000)
+
+# Constraints : Kosongo, D.R. Congo's  Supply requirements
+add.constraint(q3, c(  0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                            150,  17.7,  150,  150,  17.7,  17.7,
+                              0,     0,    0,    0,     0,     0), "=", 180000)
+
+# Constraints : Ndjamena, Chad's  Supply requirements
+add.constraint(q3, c(  0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                            150,  17.7,  150,  150,  17.7,  17.7), "=", 80000)
+
+# Contrainsts : No truck to Niamey
+
+add.constraint(q3, c(  0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     0,
+                              0,     0,    0,    0,     0,     1), "=", 0)
+
+
+add.constraint(q3, c(  0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     1,     0), "=", 0)
+
+add.constraint(q3, c(  0,     0,     0,    0,    0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     1,    0,    0,     0,     1), "=", 0)
+```
+
+```{r}
+solve(q3)
+```
+
+
+```{r}
+ps <- get.primal.solution(q3)
+
+# Have to re-enter obj fn to get Sens Ana table since cannot pull from model
+obj_fn <- c(50, 30, 55, 45, 30, 32, 
+                57, 48, 61, 49, 44, 56, 
+                24, 3, 28,22, 3, 5,  
+                22, 4, 25, 19, 5, 5, 
+                23, 7, 2, 4, 8, 9)
+
+# Get sensitivity analysis
+obj_sa <- get.sensitivity.obj(q3)
+rhs_sa <- get.sensitivity.rhs(q3)
+
+n <- length(get.variables(q3))
+m <- length(get.constr.type(q3))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(ps[2:(n + m + 1)], 
+                c(round(rhs_sa$duals[1:m], 2), obj_fn),
+                round(c(rhs_sa$dualsfrom[1:m],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:m],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(q3), colnames(q3))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+
+Solution table: 
+
+```{r echo = FALSE}
+# Print the table
+kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "bordered")) %>% 
+  add_footnote(label = ov, notation = "none")
+
+```
+
+
+Based on the above analysis, we see that for an additional ton of cargo transferred from Jacksonville to the IFRC cities, the total cost will increase by $420 while for any additional ton of cargo from New York, the total cost will increase $390. We think cost can be reduced for shipment from Florida or we might have to increase capacity of New York 
+
+
+### Q4: Maximize flow
+
+
+**Objective Function**
+
+max: +150 New_Lus +240 New_Lib +150 New_Nai +150 New_Kha +240 New_Lua +240 New_Dak
++150 Jac_Lus +240 Jac_Lib +150 Jac_Nai +150 Jac_Kha +240 Jac_Lua +240 Jac_Dak
++0 Lus_Nia +0 Lib_Nia +0 Nai_Nia +0 Kha_Nia +0 Lua_Nia +0 Dak_Nia
++0 Lus_Kos +0 Lib_Kos +0 Nai_Kos +0 Kha_Kos +0 Lua_Kos +0 Dak_Kos
++0 Lus_Ndj +0 Lib_Ndj +0 Nai_Ndj +0 Kha_Ndj +0 Lua_Ndj +0 Dak_Ndj;
+
+
+**Constraints**
+
++240 New_Dak +240 New_Lib +240 New_Lua +150 New_Kha +150 New_Lus +150 New_Nai <= 500000;
++240 Jac_Dak +240 Jac_Lib +240 Jac_Lua +150 Jac_Kha +150 Jac_Lus +150 Jac_Nai <= 500000;
+
++New_Lus <= 300;
++New_Nai <= 500;
++New_Kha <= 500;
+
++Jac_Lus <=500;
++Jac_Nai <=700;
++Jac_Kha <=600;
+
++Lus_Nia <= 200;
++Nai_Nia = 0;
++Kha_Nia <= 300;
+
++Lus_Kos <= 140;
++Nai_Kos <= 40;
++Kha_Kos <= 80;
+
++Lus_Ndj = 0;
++Nai_Ndj <= 300;
++Kha_Ndj <= 40;
+
++Lua_Kos <= 250;
++Lua_Ndj <= 240;
+
++Lib_Kos <= 300;
++Lib_Ndj <= 160;
+
++Dak_Kos <= 700;
++Dak_Ndj <= 450;
+
++Lua_Nia = 0;
++Lib_Nia = 0;
++Dak_Nia =0;
+
+
++240 New_Dak +240 Jac_Dak -17.7 Dak_Kos -17.7 Dak_Ndj <= 50000;
++240 New_Lib +240 Jac_Lib -17.7 Lib_Kos -17.7 Lib_Ndj <= 100000;
++240 New_Lua +240 Jac_Lua -17.7 Lua_Kos -17.7 Lua_Ndj <= 130000;
+
++New_Kha +Jac_Kha -Kha_Nia -Kha_Kos -Kha_Ndj <= 600;
++New_Lus +Jac_Lus -Lus_Nia -Lus_Kos -Lus_Ndj <= 1000;
++New_Nai +Jac_Nai -Nai_Nia -Nai_Kos -Nai_Ndj <= 800;
+
++150 Kha_Nia +150 Lus_Nia +150 Nai_Nia <= 100000; 
++17.7 Dak_Kos +17.7 Lib_Kos +17.7 Lua_Kos +150 Kha_Kos +150 Lus_Kos +150 Nai_Kos <= 180000;
++17.7 Dak_Ndj +17.7 Lib_Ndj +17.7 Lua_Ndj +150 Kha_Ndj +150 Lus_Ndj +150 Nai_Ndj <= 80000;
+
+
+
+
+
+```{r, results= 'hide'}
+q4 <- make.lp(0, 30)
+set.type(q4, 1:30, "int")
+
+lp.control(q4, sense = "max")
+
+obj_fn4 <- c(150, 240, 150, 150, 240, 240, 
+              150, 240, 150, 150, 240, 240, 
+              0, 0, 0, 0, 0, 0,  
+              0, 0, 0, 0, 0, 0, 
+              0, 0, 0, 0, 0, 0)
+
+set.objfn(q4, obj_fn4)
+
+### Constraints New York & Jacksonville, FL's (input constraints)
+add.constraint(q4, c(150, 240, 150, 150, 240, 240,
+                     0,   0,   0,   0,   0,   0,
+                     0,   0,   0,   0,   0,   0,
+                     0,   0,   0,   0,   0,   0,
+                     0,   0,   0,   0,   0,   0), "<=", 500000)
+
+add.constraint(q4, c(  0,   0,   0,   0,   0,   0,
+                       150, 240, 150, 150, 240, 240,
+                       0,   0,   0,   0,   0,   0,
+                       0,   0,   0,   0,   0,   0,
+                       0,   0,   0,   0,   0,   0), "<=", 500000)
+
+
+#### Constraints for output
+
+# Dakar, Senegal's Supply requirements
+add.constraint(q4, c(  0,   0,   0,   0,   0,   240,
+                       0,   0,   0,   0,   0,   240,
+                       0,   0,   0,   0,   0,  -17.7,
+                       0,   0,   0,   0,   0,  -17.7,
+                       0,   0,   0,   0,   0,  -17.7), "<=", 50000)
+
+# Libreville, Gabons's Supply requirements
+add.constraint(q4, c(  0,   240,   0,   0,   0,   0,
+                       0,   240,   0,   0,   0,   0,
+                       0, -17.7,   0,   0,   0,   0,
+                       0, -17.7,   0,   0,   0,   0,
+                       0, -17.7,   0,   0,   0,   0), "<=", 100000)
+
+# Luanda, Angola's Supply requirements
+add.constraint(q4, c(  0,  0,  0,  0,   240,  0,
+                       0,  0,  0,  0,   240,  0,
+                       0,  0,  0,  0, -17.7,  0,
+                       0,  0,  0,  0, -17.7,  0,
+                       0,  0,  0,  0, -17.7,  0), "<=", 130000)
+
+# Khartoum, Sudan's Supply requirements
+add.constraint(q4, c(  0,  0,  0,  150,  0,  0,
+                       0,  0,  0,  150,  0,  0,
+                       0,  0,  0, -150,  0,  0,
+                       0,  0,  0, -150,  0,  0,
+                       0,  0,  0, -150,  0,  0), "<=", 90000)
+
+# Lusaka, Zambia's Supply requirements
+add.constraint(q4, c(  150, 0,  0,  0,  0,  0,
+                       150, 0,  0,  0,  0,  0,
+                      -150, 0,  0,  0,  0,  0,
+                      -150, 0,  0,  0,  0,  0,
+                      -150, 0,  0,  0,  0,  0), "<=", 150000)
+
+# Nairobi, Kenya's Supply requirements
+add.constraint(q4, c(  0,  0,  150,  0,  0,  0,
+                       0,  0,  150,  0,  0,  0,
+                       0,  0, -150,  0,  0,  0,
+                       0,  0, -150,  0,  0,  0,
+                       0,  0, -150,  0,  0,  0), "<=", 120000)
+
+# Niamey, Niger's Supply requirements
+add.constraint(q4, c(  0,  0,    0,    0,  0,  0,
+                       0,  0,    0,    0,  0,  0,
+                       150, 17.7, 150, 150, 17.7, 17.7,
+                       0,  0,    0,    0,  0,  0,
+                       0,  0,    0,    0,  0,  0), "<=", 100000)
+
+# Kosongo, D.R. Congo's  Supply requirements
+add.constraint(q4, c(  0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       150,  17.7,  150,  150,  17.7,  17.7,
+                       0,     0,    0,    0,     0,     0), "<=", 180000)
+
+# Ndjamena, Chad's  Supply requirements
+add.constraint(q4, c(  0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       0,     0,    0,    0,     0,     0,
+                       150,  17.7,  150,  150,  17.7,  17.7), "<=", 80000)
+
+
+
+#### Capacities constraints: 
+
+# New York to Lusaka:
+
+add.constraint(q4, c(  1, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 300)
+
+# New York to Nairobi
+add.constraint(q4, c(  0, 0, 1, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 500)
+
+# New York to Khartoum
+add.constraint(q4, c(  0, 0, 0, 1, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 500)
+
+
+# Jacksonville to Lusaka
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       1, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 500)
+
+# Jacksonville to Nairobi
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 1, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 700)
+
+# Jacksonville to Khartoum
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 1, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 600)
+
+
+# Lusaka to Niamey
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       1, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 200)
+
+# Nairobi to Niamey
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 1, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "=", 0)
+
+# Khartoum to Niamey
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 1, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 300)
+
+
+# Lusaka to Kosongo
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       1, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 140)
+
+# Nairobi to Kosongo
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 1, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 40)
+
+# Khartoum to Kosongo
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 1, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 80)
+
+
+
+# Lusaka to Ndjamena
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       1, 0, 0, 0, 0, 0), "=", 0)
+
+# Nairobi to Ndjamena
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 1, 0, 0, 0), "<=", 300)
+
+# Khartoum to Ndjamena
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 1, 0, 0), "<=", 40)
+
+
+# Luanda to Kosongo
+
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 1, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 250)
+
+
+
+# Luanda to Ndjamena
+
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 1, 0), "<=", 240)
+
+
+
+# Libreville to Kosongo
+
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 1, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0), "<=", 300)
+
+
+
+# Libreville to Ndjamena
+
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 1, 0, 0, 0, 0), "<=", 160)
+
+
+# Dakar to Kosongo
+
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 1,
+                       0, 0, 0, 0, 0, 0), "<=", 700)
+
+
+
+# Dakar to Ndjamena
+
+add.constraint(q4, c(  0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 1), "<=", 450)
+
+
+```
+
+
+```{r}
+solve(q4)
+```
+
+```{r}
+get.objective(q4)
+```
+
+```{r}
+get.variables(q4)
+```
+
+
+The problem we can see here is that Lusaka has a softer air restriction to Kosongo (140 intead of only 40 and 80 from Nairobi and Khartoum respectively), but none of the supply get sent from Lusaka to Kosongo based on this map. We think it is to the low number of planes could come from US to Lusaka, thus we can't bring much supply from US to Lusaka to distribute to other cities. 
+
+
+# Memo
+
+**To: Gail McGovern**  
+  
+**From: Anh Nguyen (Yumi) and Yong Jae Lim (John)**  
+  
+**Date: 05/15/2020**   
+
+**RE: Aiding Africa: Disaster/disease relief plan **
+
+***
+
+Dear Gail,
+
+In response to your request that we look at the possible disaster/disease releif plans for cargo and workers can be transported between the US and Africa, we have analyzed the Aiding Africa Dataset and crafted plan for each of the requirement set of restrictions. 
+
+First of all, please refer to the below map of all possible routes we could take to bring relief packages from the US to each of the nine Africa cities that we have planned: 
+
+![](midterm_1.PNG)
+
+As we can see, there are serveral routes we can take to deliver goods from the US to Africa. However, the quickest route to bring workers and cargo to all nine cities as your "cost is no object" plan is as follow:
+
+![](midterm_2.PNG)
+
+From the map, we noticed that the route between New York to the ports cities are quite long. We think this is where the bottleneck might occur especially New York to Luanda,Angola would take more than 186 hours (almost eight days and this is the fastest route we could take from US to Luanda). We think there are things we can work on here to reduce the transportation time and help relief packages arrive sooner to those areas. 
+
+
+Secondly, as you mentioned about the "minimum cost" plan where we want to see the most economical way of transfering our cargos and workers to Africa. After trying out different models, we arrived at our final results as below: 
+
+
+![](midterm_tbl3.PNG)
+
+
+The total cost for this plan would be **`r round(get.objective(q3)/1000,2)`** million US dollars.  
+
+Also, based on our analysis, we see that for an additional ton of cargo transferred from Jacksonville to the IFRC cities, the total cost will increase by $420 while for any additional ton of cargo from New York, the total cost will increase $390. We think cost can be reduced for shipment from Florida or we might have to increase capacity of New York to be more economically.  
+
+Last but not least, with the tight restrictions on airplanes and trucks travelling within the Africa airspace, we have also developed a model to maximinize the total amount of cargo that reaches Africa. With this route, we can bring up to **`r get.objective(q4)`** tons of relief packages. 
+
+Here is the strategic network for maximum of cargos we can bring into Africa with the strict restrictions: 
+
+![](midterm_tbl4.PNG)
+
+While majority of the nine IFRC cities received the amount of cargo equal to or close to the required aids, Kosongo number doesn't looking too good with only 40,125 tons out of 180,000 required. Although Lusaka has the highest capacity of planes can fly to Kosongo, there is none assigned to bring aids to Kosongo from Lusaka. It might due to the low capacities of planes coming in from New York and Florida. In addition, Lusaka is not sending any plane to any of the three strategic cities. This is something we can work on to increase the planes that can come from US to Lusaka, and it will increase the amount of cargo to the three strategic cities. 
+ 
+Above are the three plans we mapped out based on your requirements, please let us know if you have any questions or concern. We are happy to set up a meeting to go over the analysis and models in detail if needed.
+
+
+Best regards, 
+
